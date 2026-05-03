@@ -47,7 +47,7 @@ func RecurrentBlock(ctx *context.Context, h, e *Node, config ModelConfig, loopId
 	// We reuse the existing Attention and MLP logic
 	residual := h
 	h = RMSNorm(ctx.In("input_norm"), h, config.RMSNormEPS)
-	h = Attention(ctx.In("attention"), h, config, nil) // Positional embedding handled inside
+	h = Attention(ctx.In("attention"), h, config, nil, nil) // Positional embedding handled inside
 	h = Add(h, residual)
 
 	residual = h

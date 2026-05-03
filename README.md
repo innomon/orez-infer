@@ -12,6 +12,7 @@
     - **Raspberry Pi 5:** Optimized CPU backend.
 - **Architecture Registry:** Hand-crafted mappings for Llama, Gemma, Granite, and Graphite (Mamba-2) architectures.
 - **Advanced Gemma Support:** Native integration for Gemma 3 (Multi-modal) and Gemma 4 (MTP/TurboQuant).
+- **Per-Layer Embeddings (PLE):** Memory-efficient, adaptive embedding integration for extreme context long-inference.
 - **Memory Efficient:** Uses `syscall.Mmap` for zero-copy weight loading and static KV-cache allocation.
 
 ## Installation

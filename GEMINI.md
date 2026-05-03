@@ -24,6 +24,9 @@
     - `<|audio|>` (5004): Audio mode (switches to `AudioRadiusLevels` codebook).
     - `<|image|>` (5005): Vision mode.
 - **Shared KV Cache:** Support group-based KV head sharing (typically 8 layers) in `BuildGemma4Model`.
+- **PLE (Per-Layer Embeddings):** Integrated per-layer embedding lookup for Gemma 4.
+    - **Adaptive Dequantization:** PLE tables support on-the-fly dequantization switching based on trigger tokens.
+    - **TurboQuant:** Support for 4-bit/8-bit packed PLE weights with Radius-only dequantization.
 - **TurboQuant:** Use Polar coordinates (Radius/Angle) with QJL residual correction for KV cache compression.
 
 do not search/look/grep inside .venv dirs.

@@ -6,8 +6,10 @@ import (
 
 	. "github.com/gomlx/gomlx/pkg/core/graph"
 	"github.com/gomlx/gomlx/pkg/core/shapes"
+	"github.com/gomlx/gomlx/pkg/core/dtypes"
 	"github.com/gomlx/gomlx/pkg/ml/context"
 	"github.com/gomlx/gomlx/pkg/ml/layers"
+	"github.com/gomlx/gomlx/pkg/ml/layers/activations"
 )
 
 // Gemma3Builder implements GraphBuilder for Gemma 3.
@@ -57,7 +59,7 @@ func BuildGemma3Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 	// 3. Transformer Blocks
 	for i := 0; i < config.NumLayers; i++ {
 		layerCtx := ctx.In("blk").In(strconv.Itoa(i))
-		x = GemmaBlock(layerCtx, x, config, pos, nil) // Gemma 3 does not use shared KV
+		x = GemmaBlock(layerCtx, x, tokens, config, pos, nil, nil, nil) // Gemma 3 does not use shared KV
 	}
 
 	// 4. Final Norm
@@ -94,7 +96,11 @@ func SigLIPVisionEncoder(ctx *context.Context, image *Node, config ModelConfig) 
 		x = SigLIPBlock(layerCtx, x, config)
 	}
 	
-	return LayerNorm(ctx.In("final_norm"), x, 1e-6)
+	x = LayerNorm(ctx.In("final_norm"), x, 1e-6)
+
+	// 4. Projection Layer (maps VisionHiddenSize to HiddenSize)
+	// We keep this in high precision (Float32/FP16) as suggested.
+	return layers.Dense(ctx.In("projection"), x, true, config.HiddenSize)
 }
 
 // InterleaveTokens combines text and visual embeddings.
@@ -133,6 +139,11 @@ func (b *Gemma4Builder) TensorMap(config ModelConfig) map[string]string {
 		kvP := fmt.Sprintf("blk.%d.", kvIdx)
 		m[p+"attn_k.weight"] = kvP + "attention/wk/weight"
 		m[p+"attn_v.weight"] = kvP + "attention/wv/weight"
+
+		// PLE mapping
+		if config.UsePLE {
+			m[p+"ple.weight"] = p + "ple/weight"
+		}
 	}
 
 	// Add MTP head mappings
@@ -150,8 +161,9 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 
 	// 1. Adaptive State Detection (Trigger Tokens)
 	// <|think|> (5001), <|audio|> (5004), <|image|> (5005)
-	isAudio := ReduceAny(Equal(tokens, Scalar(g, dtypes.Int32, 5004)), -1)
-	isMedical := ReduceAny(Equal(tokens, Scalar(g, dtypes.Int32, 5003)), -1) // Placeholder for medical token
+	// We use ReduceMax on Int32 as a proxy for ReduceAny on Bool.
+	isAudio := GreaterThan(ReduceMax(ConvertType(Equal(tokens, Scalar(g, dtypes.Int32, 5004)), dtypes.Int32), -1), Scalar(g, dtypes.Int32, 0))
+	isMedical := GreaterThan(ReduceMax(ConvertType(Equal(tokens, Scalar(g, dtypes.Int32, 5003)), dtypes.Int32), -1), Scalar(g, dtypes.Int32, 0))
 
 	// 2. Embedding
 	embWeight := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
@@ -175,10 +187,7 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 
 		// In a full implementation, we would pass isAudio/isMedical to dequant kernels
 		// For now, they establish the conditional graph structure.
-		_ = isAudio
-		_ = isMedical
-
-		x = GemmaBlock(layerCtx, x, config, pos, kvCtx)
+		x = GemmaBlock(layerCtx, x, tokens, config, pos, kvCtx, isAudio, isMedical)
 	}
 
 	// 5. Final Norm
@@ -201,8 +210,6 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 
 // BuildMTPHeads implements Medusa-style Multi-Token Prediction heads.
 func BuildMTPHeads(ctx *context.Context, x *Node, config ModelConfig, embWeight *Node) []*Node {
-	g := x.Graph()
-	dtype := x.Shape().DType
 	heads := make([]*Node, config.NumMTPHeads)
 
 	for i := 0; i < config.NumMTPHeads; i++ {
@@ -211,7 +218,7 @@ func BuildMTPHeads(ctx *context.Context, x *Node, config ModelConfig, embWeight 
 		
 		// 1. Non-linear projection
 		h := layers.Dense(headCtx.In("proj"), x, false, config.HiddenSize)
-		h = activations.Silu(h)
+		h = activations.Swish(h)
 		h = Add(h, x) // Residual connection
 		
 		// 2. Head Norm

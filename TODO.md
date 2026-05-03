@@ -9,8 +9,9 @@
 - [x] **TurboQuant Kernels (Phase 2):** Implement PolarQuant and QJL compression/decompression in GoMLX.
 - [x] **Shared KV Cache (Phase 2):** Implement logic for layers to share KV cache groups for Gemma 4.
 - [x] **Multimodal Support:** Native SigLIP integration and interleaved vision/text embeddings.
+- [x] **PLE (Per-Layer Embeddings):** Integrated per-layer embedding lookup with adaptive TurboQuant dequantization for Gemma 4.
 
-## Current Status: Functional Prototype with OpenAI API
+## Current Status: Functional Prototype with OpenAI API & PLE Support
 The engine supports a wide range of architectures including Llama, Gemma, and Granite, with a fully functional OpenAI-compatible server.
 
 ## Gemma 3/4 Gaps (Track-009)

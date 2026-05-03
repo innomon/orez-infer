@@ -39,7 +39,7 @@ func (t *UniversalTransformer) buildCore(ctx *context.Context, x *Node, pos *Nod
 		if hybrid && i%4 != 0 { // Example: Every 4th layer is Attention, others are SSM
 			h = Mamba2(layerCtx.In("ssm"), h, t.Config)
 		} else {
-			h = Attention(layerCtx.In("attention"), h, t.Config, pos)
+			h = Attention(layerCtx.In("attention"), h, t.Config, pos, nil)
 		}
 		h = Add(h, residual)
 		

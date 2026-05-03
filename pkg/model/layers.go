@@ -144,8 +144,10 @@ func Attention(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kvC
 	v = Reshape(v, batchSize, seqLen, numKVHeads, headDim)
 	
 	// Apply RoPE
-	q = RoPE(q, pos, config.RoPEBase)
-	k = RoPE(k, pos, config.RoPEBase)
+	if pos != nil {
+		q = RoPE(q, pos, config.RoPEBase)
+		k = RoPE(k, pos, config.RoPEBase)
+	}
 	
 	// KV Cache handling would go here (pre-allocated in context)
 	
@@ -335,8 +337,27 @@ func NonCausalAttention(ctx *context.Context, x *Node, config ModelConfig) *Node
 	return layers.Dense(ctx.In("wo"), out, true, hiddenSize)
 }
 
+// ApplyPLE applies Per-Layer Embedding lookup, optionally using TurboQuant dequantization.
+func ApplyPLE(ctx *context.Context, tokens *Node, config ModelConfig, isAudio, isMedical *Node) *Node {
+	g := tokens.Graph()
+	pleCtx := ctx.In("ple")
+	
+	if config.TurboQuantPLE {
+		// 8-bit packed TurboQuant PLE weights
+		packed := pleCtx.VariableWithShape("weight", shapes.Make(dtypes.Uint8, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
+		xPacked := Gather(packed, tokens)
+		// Dequantize on-the-fly using the adaptive state.
+		return DequantizeTurboQuant(xPacked, isAudio, isMedical)
+	}
+	
+	// Fallback to standard float weights
+	dtype := tokens.Shape().DType
+	weight := pleCtx.VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
+	return Gather(weight, tokens)
+}
+
 // GemmaBlock represents a single Gemma transformer layer.
-func GemmaBlock(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kvCtx *context.Context) *Node {
+func GemmaBlock(ctx *context.Context, x *Node, tokens *Node, config ModelConfig, pos *Node, kvCtx *context.Context, isAudio, isMedical *Node) *Node {
 	// 1. Pre-Attention Norm
 	normX := GemmaRMSNorm(ctx.In("pre_attention_norm"), x, config.RMSNormEPS)
 	
@@ -344,10 +365,16 @@ func GemmaBlock(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kv
 	attn := Attention(ctx.In("attention"), normX, config, pos, kvCtx)
 	x = Add(x, attn)
 	
-	// 3. Pre-MLP Norm
+	// 3. PLE (Per-Layer Embedding) for Gemma 4
+	if config.UsePLE && tokens != nil {
+		pleEmb := ApplyPLE(ctx, tokens, config, isAudio, isMedical)
+		x = Add(x, pleEmb)
+	}
+
+	// 4. Pre-MLP Norm
 	normX = GemmaRMSNorm(ctx.In("pre_mlp_norm"), x, config.RMSNormEPS)
 	
-	// 4. MLP
+	// 5. MLP
 	mlpOut := GemmaMLP(ctx.In("mlp"), normX, config.IntermediateSize)
 	x = Add(x, mlpOut)
 	

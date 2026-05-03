@@ -18,8 +18,9 @@ Implement native GoMLX inference for Gemma 3 and Gemma 4 models, incorporating a
 ### Phase 2: Gemma 4 & TurboQuant
 5. **[x] TurboQuant Kernels:** Implement PolarQuant and QJL compression/decompression in `pkg/model/quant.go`.
 6. **[x] Shared KV Cache:** Implement logic for layers to share KV cache groups in `pkg/model/layers.go`.
-7. **[x] Gemma 4 Architecture:** Build the `BuildGemma4Model` graph template in `pkg/model/gemma.go`.
-8. **[x] Adaptive State:** Implement token-triggered precision detection in `BuildGemma4Model`.
+7. **[x] PLE Integration:** Implement Per-Layer Embeddings and adaptive dequantization in `pkg/model/layers.go`.
+8. **[x] Gemma 4 Architecture:** Build the `BuildGemma4Model` graph template in `pkg/model/gemma.go`.
+9. **[x] Adaptive State:** Implement token-triggered precision detection in `BuildGemma4Model`.
 
 ### Phase 3: MTP & Speculative Decoding
 9. **[x] MTP Heads:** Implement the Medusa-style projection heads in `pkg/model/gemma.go`.

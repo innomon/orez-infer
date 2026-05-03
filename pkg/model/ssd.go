@@ -92,7 +92,7 @@ func (b *GraniteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node
 
 		// Interleaving: 1 Transformer layer every 10 layers (at 0, 10, 20, 30)
 		if i%10 == 0 {
-			h = Attention(layerCtx.In("attention"), h, config, pos)
+			h = Attention(layerCtx.In("attention"), h, config, pos, nil)
 		} else {
 			// SSD / Mamba-2 (NoPE: skip pos)
 			h = BuildSSDLayer(layerCtx.In("ssd"), h, config)

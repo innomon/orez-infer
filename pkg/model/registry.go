@@ -1,12 +1,8 @@
 package model
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/gomlx/gomlx/pkg/ml/context"
 	. "github.com/gomlx/gomlx/pkg/core/graph"
-	"github.com/gomlx/gomlx/pkg/core/shapes"
 )
 
 // ModelConfig contains the parameters for a specific model architecture.
@@ -34,6 +30,9 @@ type ModelConfig struct {
 	// Gemma 4 specific
 	NumMTPHeads      int
 	KVSharingRange   int // e.g., 8
+	UsePLE           bool
+	TurboQuantPLE    bool
+	TurboQuantKV     bool
 }
 
 // GraphBuilder defines the interface for constructing architecture-specific graphs.

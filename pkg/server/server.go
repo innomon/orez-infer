@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/gomlx/gomlx/backends"
+	"github.com/gomlx/gomlx/pkg/core/tensors"
 	"github.com/gomlx/gomlx/pkg/ml/context"
 	"github.com/innomon/orez-infer/pkg/model"
 	"github.com/innomon/orez-infer/pkg/tokenizer"
-)
-
+	)
 // Server handles OpenAI-compatible requests.
 type Server struct {
 	Backend   backends.Backend

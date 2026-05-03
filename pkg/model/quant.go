@@ -93,7 +93,7 @@ func DequantizeTurboQuant(packed *Node, isAudio, isMedical *Node) *Node {
 	
 	// Interleave x and y if they represent complex or 2D manifolds
 	// For simplicity, let's return x (assuming real-valued weights)
-	// In some variants, x and y are two separate weights.
+	_ = y
 	return x
 }
 
@@ -115,9 +115,16 @@ func DequantizeRadius(indices *Node, isAudio, isMedical *Node) *Node {
 	
 	res := resStd
 	if isAudio != nil {
+		// Broadcast isAudio [batch] to [batch, 1, 1] for [batch, seq, hidden]
+		for isAudio.Rank() < res.Rank() {
+			isAudio = ExpandDims(isAudio, -1)
+		}
 		res = Where(isAudio, resAudio, res)
 	}
 	if isMedical != nil {
+		for isMedical.Rank() < res.Rank() {
+			isMedical = ExpandDims(isMedical, -1)
+		}
 		res = Where(isMedical, resMed, res)
 	}
 	return ConvertType(res, dtypes.Float32)
@@ -134,6 +141,33 @@ func DequantizeAngle(indices *Node) *Node {
 	normalized := Div(Add(idxF, centerOffset), sectors)
 	theta := Sub(Mul(normalized, twoPi), pi)
 	return theta
+}
+
+// DequantizePLE4Bit dequantizes 4-bit PLE weights (Radius only).
+func DequantizePLE4Bit(packed *Node, isAudio, isMedical *Node) *Node {
+	g := packed.Graph()
+	// Assuming 4-bit weights are stored as 2 weights per Uint8
+	// Low nibble
+	lowIdx := Mod(packed, Scalar(g, dtypes.Uint8, 16))
+	// High nibble
+	highIdx := Div(packed, Scalar(g, dtypes.Uint8, 16))
+	
+	rLow := DequantizeRadius(lowIdx, isAudio, isMedical)
+	rHigh := DequantizeRadius(highIdx, isAudio, isMedical)
+	
+	// Interleave or concatenate as needed. 
+	// For PLE lookup, we usually want one weight per token.
+	// If each token has 4-bit, we unpack it.
+	return Concatenate([]*Node{rLow, rHigh}, -1)
+}
+
+// DequantizeKV3Bit dequantizes 3-bit KV cache (Angle only).
+func DequantizeKV3Bit(packed *Node) *Node {
+	g := packed.Graph()
+	// 3-bit weights might be packed 2 per Uint8 (leaving 2 bits unused) or more densely.
+	// Placeholder for 3-bit circular dequantization.
+	angleIdx := Mod(packed, Scalar(g, dtypes.Uint8, 8))
+	return DequantizeAngle(angleIdx)
 }
 
 // XLAFusion: Example of fusing dequant with MatMul
