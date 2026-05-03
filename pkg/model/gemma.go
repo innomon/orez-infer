@@ -13,8 +13,8 @@ import (
 // Gemma3Builder implements GraphBuilder for Gemma 3.
 type Gemma3Builder struct{}
 
-func (b *Gemma3Builder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
-	return BuildGemma3Model(ctx, x, config, pos)
+func (b *Gemma3Builder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
+	return BuildGemma3Model(ctx, x, config, pos, image)
 }
 
 func (b *Gemma3Builder) TensorMap(config ModelConfig) map[string]string {
@@ -40,7 +40,7 @@ func (b *Gemma3Builder) TensorMap(config ModelConfig) map[string]string {
 }
 
 // BuildGemma3Model builds the full Gemma 3 model graph.
-func BuildGemma3Model(ctx *context.Context, tokens *Node, config ModelConfig, pos *Node) *Node {
+func BuildGemma3Model(ctx *context.Context, tokens *Node, config ModelConfig, pos *Node, image *Node) *Node {
 	g := tokens.Graph()
 	dtype := tokens.Shape().DType
 
@@ -49,9 +49,10 @@ func BuildGemma3Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 	x := Gather(embWeight, tokens)
 
 	// 2. Vision Encoder (Optional)
-	// In a real scenario, visualTokens would be an input to the graph.
-	// For now, we assume visualTokens are provided or handled via placeholders.
-	// x = InterleaveTokens(ctx, x, visualTokens)
+	if image != nil {
+		visualTokens := SigLIPVisionEncoder(ctx, image, config)
+		x = InterleaveTokens(ctx, x, visualTokens)
+	}
 
 	// 3. Transformer Blocks
 	for i := 0; i < config.NumLayers; i++ {
@@ -105,8 +106,8 @@ func InterleaveTokens(ctx *context.Context, textX, visionX *Node) *Node {
 // Gemma4Builder implements GraphBuilder for Gemma 4.
 type Gemma4Builder struct{}
 
-func (b *Gemma4Builder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
-	return BuildGemma4Model(ctx, x, config, pos)
+func (b *Gemma4Builder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
+	return BuildGemma4Model(ctx, x, config, pos, image)
 }
 
 func (b *Gemma4Builder) TensorMap(config ModelConfig) map[string]string {
@@ -143,7 +144,7 @@ func (b *Gemma4Builder) TensorMap(config ModelConfig) map[string]string {
 }
 
 // BuildGemma4Model builds the full Gemma 4 model graph.
-func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, pos *Node) *Node {
+func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, pos *Node, image *Node) *Node {
 	g := tokens.Graph()
 	dtype := tokens.Shape().DType
 
@@ -156,7 +157,13 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 	embWeight := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
 	x := Gather(embWeight, tokens)
 
-	// 3. Transformer Blocks with Shared KV Cache and Adaptive Precision
+	// 3. Vision Encoder (Optional)
+	if image != nil {
+		visualTokens := SigLIPVisionEncoder(ctx, image, config)
+		x = InterleaveTokens(ctx, x, visualTokens)
+	}
+
+	// 4. Transformer Blocks with Shared KV Cache and Adaptive Precision
 	for i := 0; i < config.NumLayers; i++ {
 		layerCtx := ctx.In("blk").In(strconv.Itoa(i))
 
@@ -174,13 +181,13 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 		x = GemmaBlock(layerCtx, x, config, pos, kvCtx)
 	}
 
-	// 4. Final Norm
+	// 5. Final Norm
 	x = GemmaRMSNorm(ctx.In("output_norm"), x, config.RMSNormEPS)
 
-	// 4. Output Head
+	// 6. Output Head
 	logits := Dot(x, Transpose(embWeight, 0, 1)).MatMul()
 
-	// 5. MTP Heads (Phase 3)
+	// 7. MTP Heads (Phase 3)
 	var mtpLogits []*Node
 	if config.NumMTPHeads > 0 {
 		mtpLogits = BuildMTPHeads(ctx, x, config, embWeight)

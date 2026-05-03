@@ -23,23 +23,23 @@ The API server should be integrated into the main `orez-infer` CLI but also exis
 ## 3. Implementation Plan
 
 ### Phase 1: API Structure & Schema
-- [ ] Define OpenAI-compatible structs in `pkg/server/types.go` (Requests, Responses, Message types).
-- [ ] Implement the base `Server` struct and handler registry in `pkg/server/server.go`.
+- [x] Define OpenAI-compatible structs in `pkg/server/types.go` (Requests, Responses, Message types).
+- [x] Implement the base `Server` struct and handler registry in `pkg/server/server.go`.
 
 ### Phase 2: Inference Integration
-- [ ] Implement `handleListModels` using `pkg/model/registry.go`.
-- [ ] Implement `handleChatCompletions` bridging to `pkg/model`'s `Generate` functions.
-- [ ] Support for GGUF metadata extraction to populate model information.
+- [x] Implement `handleListModels` using `pkg/model/registry.go`.
+- [x] Implement `handleChatCompletions` bridging to `pkg/model`'s `Generate` functions.
+- [x] Support for GGUF metadata extraction to populate model information.
 
 ### Phase 3: Advanced Features
-- [ ] **Multimodal Support:** Integrate vision encoder handling for models like MedGemma/Gemma 3.
-- [ ] **Streaming (SSE):** Implement chunked responses for `/v1/chat/completions`.
-- [ ] **MTP/Speculative Decoding:** (Optional) Support for accelerated generation if available in the model architecture.
+- [x] **Multimodal Support:** Integrate vision encoder handling for models like MedGemma/Gemma 3.
+- [x] **Streaming (SSE):** Implement chunked responses for `/v1/chat/completions`.
+- [x] **MTP/Speculative Decoding:** (Optional) Support for accelerated generation if available in the model architecture.
 
 ### Phase 4: CLI & Validation
-- [ ] Add `serve` subcommand to `cmd/orez-infer/main.go`.
-- [ ] Implement flags: `--port`, `--model-path`, `--backend`, `--device`.
-- [ ] Validate with standard tools like `curl`, `openai-python` client, and `AnythingLLM`.
+- [x] Add `serve` subcommand to `cmd/orez-infer/main.go`.
+- [x] Implement flags: `--port`, `--model-path`, `--backend`, `--device`.
+- [x] Validate with standard tools like `curl`, `openai-python` client, and `AnythingLLM`.
 
 ## 4. References
 - `../go-turboquant/cmd/api/main.go` (Entry point)

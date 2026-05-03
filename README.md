@@ -41,6 +41,8 @@ The unified downloader handles different formats and ensures all required files 
 ### 3. Start OpenAI API Server
 Launch a local, OpenAI-compatible server to use `orez-infer` with standard clients like AnythingLLM or Python `openai` library.
 
+For detailed information on multimodal support, see **[MedGemma 1.5 Support](./docs/MEDGEMMA_SUPPORT.md)**.
+
 ```bash
 ./orez-infer serve --model models/gemma-4-E2B.gguf --tokenizer models/tokenizer.model --port 8080 --backend metal
 ```

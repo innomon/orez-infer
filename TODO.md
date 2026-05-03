@@ -4,20 +4,18 @@
 - [x] **Unified Downloader:** Robust format-aware downloader for GGUF, Safetensors, and LiteRT.
 - [x] **GGUF Parser:** Native Go parser for metadata and tensor info.
 - [x] **Architecture Registry:** Hand-crafted mapping system for multi-model support.
-- [x] **OpenAI API (Phase 1 & 2):** Core API structure and basic inference integration.
-- [x] **Gemma 3/4 (Phase 1):** Core layers (RMSNorm, SwiGLU) and graph templates for Gemma 3 (multi-modal) and Gemma 4.
+- [x] **OpenAI API (Full):** Complete REST server with streaming, chat templates, and multimodal support.
+- [x] **Gemma 3/4 (Structural):** Core layers, graph templates, and vision encoder interleaving for Gemma 3/4.
 - [x] **TurboQuant Kernels (Phase 2):** Implement PolarQuant and QJL compression/decompression in GoMLX.
 - [x] **Shared KV Cache (Phase 2):** Implement logic for layers to share KV cache groups for Gemma 4.
+- [x] **Multimodal Support:** Native SigLIP integration and interleaved vision/text embeddings.
 
-## Current Status: Structural Implementation
-The engine architecture is fully established, including the GGUF parser, the architecture registry, and the universal transformer template.
+## Current Status: Functional Prototype with OpenAI API
+The engine supports a wide range of architectures including Llama, Gemma, and Granite, with a fully functional OpenAI-compatible server.
 
-## Gemma 3/4 Implementation Gaps (Track-009)
-
-- [ ] **TurboQuant Kernels:** Implement PolarQuant and QJL compression/decompression in GoMLX.
+## Gemma 3/4 Gaps (Track-009)
 - [ ] **MTP Heads:** Implement Medusa-style heads and tree-based verification.
-- [ ] **Shared KV Cache:** Implement group-based KV cache sharing for Gemma 4.
-- [ ] **SigLIP Interleaving:** Finalize vision token insertion logic for Gemma 3.
+- [ ] **Production Kernels:** Optimize TurboQuant GoMLX implementations for Metal.
 
 ## Mamba-2 (SSM) Implementation Gaps (Track-004)
 

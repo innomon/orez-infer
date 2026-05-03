@@ -44,10 +44,14 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
-	// For now, return a static list or query the registry if possible.
+	modelID := "orez-infer-model"
+	if s.Runner != nil && s.Runner.Config.Name != "" {
+		modelID = s.Runner.Config.Name
+	}
+
 	models := []Model{
 		{
-			ID:      "orez-recurrent-v1",
+			ID:      modelID,
 			Object:  "model",
 			Created: time.Now().Unix(),
 			OwnedBy: "orez",
@@ -73,12 +77,6 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement inference bridge
-	// This will involve:
-	// 1. Tokenizing the input messages.
-	// 2. Running the GoMLX graph.
-	// 3. Handling streaming vs non-streaming responses.
-
 	if req.Stream {
 		s.handleStreamingChat(w, req)
 	} else {
@@ -88,6 +86,7 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBlockingChat(w http.ResponseWriter, req ChatCompletionRequest) {
 	prompt := s.extractPrompt(req)
+	imageTensor := s.extractImage(req)
 	
 	if s.Runner == nil {
 		http.Error(w, "model not loaded", http.StatusInternalServerError)
@@ -96,10 +95,10 @@ func (s *Server) handleBlockingChat(w http.ResponseWriter, req ChatCompletionReq
 
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
-		maxTokens = 50 // Default
+		maxTokens = 128 // Default
 	}
 
-	content, err := s.Runner.Generate(prompt, s.Tokenizer, maxTokens, nil)
+	content, err := s.Runner.GenerateMultimodal(prompt, imageTensor, s.Tokenizer, maxTokens, nil)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("inference failed: %v", err), http.StatusInternalServerError)
 		return
@@ -128,6 +127,7 @@ func (s *Server) handleBlockingChat(w http.ResponseWriter, req ChatCompletionReq
 
 func (s *Server) handleStreamingChat(w http.ResponseWriter, req ChatCompletionRequest) {
 	prompt := s.extractPrompt(req)
+	imageTensor := s.extractImage(req)
 
 	if s.Runner == nil {
 		http.Error(w, "model not loaded", http.StatusInternalServerError)
@@ -146,12 +146,12 @@ func (s *Server) handleStreamingChat(w http.ResponseWriter, req ChatCompletionRe
 
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
-		maxTokens = 50 // Default
+		maxTokens = 128 // Default
 	}
 
 	id := fmt.Sprintf("chatcmpl-%d", time.Now().Unix())
 	
-	_, err := s.Runner.Generate(prompt, s.Tokenizer, maxTokens, func(token string) {
+	_, err := s.Runner.GenerateMultimodal(prompt, imageTensor, s.Tokenizer, maxTokens, func(token string) {
 		chunk := ChatCompletionChunk{
 			ID:      id,
 			Object:  "chat.completion.chunk",
@@ -172,7 +172,6 @@ func (s *Server) handleStreamingChat(w http.ResponseWriter, req ChatCompletionRe
 	})
 
 	if err != nil {
-		// Can't set error header if we already started streaming
 		fmt.Fprintf(w, "data: {\"error\": \"%v\"}\n\n", err)
 	}
 
@@ -180,14 +179,80 @@ func (s *Server) handleStreamingChat(w http.ResponseWriter, req ChatCompletionRe
 	flusher.Flush()
 }
 
-func (s *Server) extractPrompt(req ChatCompletionRequest) string {
-	// Simple concat for now. In production, use chat templates.
-	var sb strings.Builder
+func (s *Server) extractImage(req ChatCompletionRequest) *tensors.Tensor {
+	// Search for image_url in messages
 	for _, msg := range req.Messages {
-		if content, ok := msg.Content.(string); ok {
-			sb.WriteString(content)
-			sb.WriteString("\n")
+		if parts, ok := msg.Content.([]any); ok {
+			for _, p := range parts {
+				if part, ok := p.(map[string]any); ok {
+					if t, ok := part["type"].(string); ok && t == "image_url" {
+						if imgURL, ok := part["image_url"].(map[string]any); ok {
+							url := imgURL["url"].(string)
+							fmt.Printf("🖼  Detected image URL: %s (Downloading placeholder)\n", url)
+							
+							// Placeholder: Return a zero tensor of the required size
+							if s.Runner != nil && s.Runner.Config.ImageSize > 0 {
+								size := s.Runner.Config.ImageSize
+								return tensors.FromScalarAndDimensions(float32(0), 1, 3, size, size)
+							}
+						}
+					}
+				}
+			}
 		}
+	}
+	return nil
+}
+
+func (s *Server) extractPrompt(req ChatCompletionRequest) string {
+	arch := "gemma" // Default
+	if s.Runner != nil {
+		arch = s.Runner.Config.Name
+	}
+
+	var sb strings.Builder
+	switch {
+	case strings.Contains(arch, "gemma"):
+		// Gemma Chat Template: <start_of_turn>user\nPROMPT<end_of_turn>\n<start_of_turn>model\n
+		for _, msg := range req.Messages {
+			content := ""
+			if c, ok := msg.Content.(string); ok {
+				content = c
+			} else if parts, ok := msg.Content.([]any); ok {
+				// Basic multimodal part extraction
+				for _, p := range parts {
+					if part, ok := p.(map[string]any); ok {
+						if t, ok := part["type"].(string); ok && t == "text" {
+							content += part["text"].(string)
+						}
+					}
+				}
+			}
+			
+			sb.WriteString(fmt.Sprintf("<start_of_turn>%s\n%s<end_of_turn>\n", msg.Role, content))
+		}
+		sb.WriteString("<start_of_turn>model\n")
+	
+	case strings.Contains(arch, "llama"):
+		// Llama 3 Template: <|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\nPROMPT<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n
+		sb.WriteString("<|begin_of_text|>")
+		for _, msg := range req.Messages {
+			content := ""
+			if c, ok := msg.Content.(string); ok {
+				content = c
+			}
+			sb.WriteString(fmt.Sprintf("<|start_header_id|>%s<|end_header_id|>\n\n%s<|eot_id|>", msg.Role, content))
+		}
+		sb.WriteString("<|start_header_id|>assistant<|end_header_id|>\n\n")
+
+	default:
+		// Fallback to simple concatenation
+		for _, msg := range req.Messages {
+			if content, ok := msg.Content.(string); ok {
+				sb.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, content))
+			}
+		}
+		sb.WriteString("assistant: ")
 	}
 	return sb.String()
 }

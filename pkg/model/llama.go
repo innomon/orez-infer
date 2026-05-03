@@ -9,7 +9,7 @@ import (
 // LlamaBuilder implements GraphBuilder for Llama architectures.
 type LlamaBuilder struct{}
 
-func (b *LlamaBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
+func (b *LlamaBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
 	t := &UniversalTransformer{Config: config}
 	return t.BuildGraph(ctx, x, pos)
 }

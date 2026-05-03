@@ -70,20 +70,26 @@ func BuildSSDLayer(ctx *context.Context, x *Node, config ModelConfig) *Node {
 // GraniteBuilder implements the hybrid architecture.
 type GraniteBuilder struct{}
 
-func (b *GraniteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
+func (b *GraniteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
 	g := x.Graph()
 	dtype := x.Shape().DType
-	
+
 	// 1. Embeddings
 	embd := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
 	h := Gather(embd, x)
-	
-	// 2. Hybrid Layers (40 total: 4 Transformer, 36 Mamba-2)
+
+	// 2. Vision Encoder (Optional)
+	if image != nil {
+		visualTokens := SigLIPVisionEncoder(ctx, image, config)
+		h = InterleaveTokens(ctx, h, visualTokens)
+	}
+
+	// 3. Hybrid Layers (40 total: 4 Transformer, 36 Mamba-2)
 	for i := 0; i < 40; i++ {
 		layerCtx := ctx.In(fmt.Sprintf("layer_%d", i))
 		residual := h
 		h = RMSNorm(layerCtx.In("pre_norm"), h, config.RMSNormEPS)
-		
+
 		// Interleaving: 1 Transformer layer every 10 layers (at 0, 10, 20, 30)
 		if i%10 == 0 {
 			h = Attention(layerCtx.In("attention"), h, config, pos)
@@ -92,19 +98,18 @@ func (b *GraniteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node
 			h = BuildSSDLayer(layerCtx.In("ssd"), h, config)
 		}
 		h = Add(h, residual)
-		
+
 		// MLP (SwiGLU)
 		residual = h
 		h = RMSNorm(layerCtx.In("post_norm"), h, config.RMSNormEPS)
 		h = MLP(layerCtx.In("mlp"), h, 8192, "swiglu")
 		h = Add(h, residual)
 	}
-	
-	// 3. Final Norm & Head
+
+	// 4. Final Norm & Head
 	h = RMSNorm(ctx.In("final_norm"), h, config.RMSNormEPS)
 	return Dot(h, Transpose(embd, 0, 1)).MatMul()
 }
-
 func (b *GraniteBuilder) TensorMap(config ModelConfig) map[string]string {
 	m := make(map[string]string)
 	m["token_embd.weight"] = "token_embd/weight"

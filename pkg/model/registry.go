@@ -38,7 +38,7 @@ type ModelConfig struct {
 
 // GraphBuilder defines the interface for constructing architecture-specific graphs.
 type GraphBuilder interface {
-	Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node
+	Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node
 	TensorMap(config ModelConfig) map[string]string
 }
 
@@ -54,6 +54,9 @@ func NewArchRegistry() *ArchRegistry {
 	r.Register("recurrent", &RecurrentBuilder{})
 	r.Register("gemma-3", &Gemma3Builder{})
 	r.Register("gemma-4", &Gemma4Builder{})
+	r.Register("llama", &LlamaBuilder{})
+	r.Register("graphite", &GraphiteBuilder{})
+	r.Register("granite", &GraniteBuilder{})
 	return r
 }
 
@@ -69,7 +72,7 @@ func (r *ArchRegistry) Get(name string) (GraphBuilder, bool) {
 // RecurrentBuilder implements GraphBuilder for RDT architectures.
 type RecurrentBuilder struct{}
 
-func (b *RecurrentBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
+func (b *RecurrentBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
 	// For RDT, we use a fixed number of loops from config or default.
 	numLoops := 8 // Default to 8 loops if not specified
 	t := &RecurrentTransformer{Config: config, Loops: numLoops}

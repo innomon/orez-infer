@@ -29,7 +29,12 @@ func NewRunner(backend backends.Backend, ctx *context.Context, builder GraphBuil
 
 	// JIT compile the graph
 	exec, err := context.NewExec(backend, ctx, func(ctx *context.Context, x *Node, pos *Node) *Node {
-		return builder.Build(ctx, config, x, pos)
+		var image *Node
+		if config.ImageSize > 0 {
+			// Define image input: [batch, 3, image_size, image_size]
+			image = Parameter(x.Graph(), "image", shapes.Make(x.Shape().DType, 1, 3, config.ImageSize, config.ImageSize))
+		}
+		return builder.Build(ctx, config, x, pos, image)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile graph: %w", err)
@@ -41,6 +46,11 @@ func NewRunner(backend backends.Backend, ctx *context.Context, builder GraphBuil
 
 // Generate produces a sequence of tokens starting from the given prompt.
 func (r *Runner) Generate(prompt string, t tokenizer.Tokenizer, maxTokens int, callback func(string)) (string, error) {
+	return r.GenerateMultimodal(prompt, nil, t, maxTokens, callback)
+}
+
+// GenerateMultimodal produces a sequence of tokens starting from the given prompt and optional image.
+func (r *Runner) GenerateMultimodal(prompt string, imageTensor *tensors.Tensor, t tokenizer.Tokenizer, maxTokens int, callback func(string)) (string, error) {
 	tokens := t.Encode(prompt)
 	currentIds := make([]int32, len(tokens))
 	for i, id := range tokens {
@@ -50,13 +60,22 @@ func (r *Runner) Generate(prompt string, t tokenizer.Tokenizer, maxTokens int, c
 	var generated []int32
 	for i := 0; i < maxTokens; i++ {
 		// 1. Prepare Tensors
-		// For now, we pass the full sequence (stateless prototype)
-		// TODO: Implement stateful KV cache with pos indexing
 		inputTensor := tensors.FromFlatDataAndDimensions(currentIds, 1, len(currentIds))
 		posTensor := tensors.FromScalarAndDimensions(int32(0), 1, len(currentIds))
 
 		// 2. Execute
-		results, err := r.Exec.Exec(inputTensor, posTensor)
+		var results []*tensors.Tensor
+		var err error
+		if imageTensor != nil {
+			results, err = r.Exec.Exec(inputTensor, posTensor, imageTensor)
+		} else if r.Config.ImageSize > 0 {
+			// If graph expects an image but none provided, pass a dummy/zero tensor
+			dummyImage := tensors.FromScalarAndDimensions(float32(0), 1, 3, r.Config.ImageSize, r.Config.ImageSize)
+			results, err = r.Exec.Exec(inputTensor, posTensor, dummyImage)
+		} else {
+			results, err = r.Exec.Exec(inputTensor, posTensor)
+		}
+		
 		if err != nil {
 			return "", fmt.Errorf("inference error at step %d: %w", i, err)
 		}
@@ -64,8 +83,6 @@ func (r *Runner) Generate(prompt string, t tokenizer.Tokenizer, maxTokens int, c
 		logits := results[0]
 		
 		// 3. Sample (Greedy for now)
-		// logits: [batch, seq, vocab]
-		// We want the last token's logits
 		nextId := r.greedySample(logits)
 		
 		if nextId == 1 { // EOS placeholder

@@ -9,7 +9,7 @@ import (
 // GraphiteBuilder implements GraphBuilder for SSM-based architectures.
 type GraphiteBuilder struct{}
 
-func (b *GraphiteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node) *Node {
+func (b *GraphiteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node, pos *Node, image *Node) *Node {
 	// Hybrid architecture: some layers are Attention, some are SSM.
 	// For simplicity in this implementation, we'll assume a configurable layer type.
 	
