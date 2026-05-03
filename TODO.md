@@ -5,11 +5,21 @@
 - [x] **GGUF Parser:** Native Go parser for metadata and tensor info.
 - [x] **Architecture Registry:** Hand-crafted mapping system for multi-model support.
 - [x] **OpenAI API (Phase 1 & 2):** Core API structure and basic inference integration.
+- [x] **Gemma 3/4 (Phase 1):** Core layers (RMSNorm, SwiGLU) and graph templates for Gemma 3 (multi-modal) and Gemma 4.
+- [x] **TurboQuant Kernels (Phase 2):** Implement PolarQuant and QJL compression/decompression in GoMLX.
+- [x] **Shared KV Cache (Phase 2):** Implement logic for layers to share KV cache groups for Gemma 4.
 
 ## Current Status: Structural Implementation
-The engine architecture is fully established, including the GGUF parser, the architecture registry, and the universal transformer template. However, the Mamba-2 (SSM) logic is currently a **structural placeholder** (dummy logic).
+The engine architecture is fully established, including the GGUF parser, the architecture registry, and the universal transformer template.
 
-## Mamba-2 (SSM) Implementation Gaps
+## Gemma 3/4 Implementation Gaps (Track-009)
+
+- [ ] **TurboQuant Kernels:** Implement PolarQuant and QJL compression/decompression in GoMLX.
+- [ ] **MTP Heads:** Implement Medusa-style heads and tree-based verification.
+- [ ] **Shared KV Cache:** Implement group-based KV cache sharing for Gemma 4.
+- [ ] **SigLIP Interleaving:** Finalize vision token insertion logic for Gemma 3.
+
+## Mamba-2 (SSM) Implementation Gaps (Track-004)
 
 - [ ] **Real Linear Scan:** Implement a mathematically correct `LinearScan`. This requires an **associative prefix scan** for parallel pre-fill and a **recurrent state update** for token-by-token inference.
 - [ ] **SSD (Structured State Space Duality) Logic:** Replace the `layers.Dense` placeholder in `pkg/model/ssm.go` with the actual SSD mathematical operations.

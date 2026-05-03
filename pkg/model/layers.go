@@ -5,6 +5,7 @@ import (
 	. "github.com/gomlx/gomlx/pkg/core/graph"
 	"github.com/gomlx/gomlx/pkg/core/shapes"
 	"github.com/gomlx/gomlx/pkg/core/dtypes"
+	"github.com/gomlx/gomlx/pkg/ml/layers"
 	"github.com/gomlx/gomlx/pkg/ml/layers/activations"
 )
 
@@ -110,7 +111,7 @@ func RoPE(x *Node, offset *Node, base float64) *Node {
 }
 
 // Attention implements Multi-Head or Grouped-Query Attention.
-func Attention(ctx *context.Context, x *Node, config ModelConfig, pos *Node) *Node {
+func Attention(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kvCtx *context.Context) *Node {
 	g := x.Graph()
 	dtype := x.Shape().DType
 	batchSize := x.Shape().Dimensions[0]
@@ -120,10 +121,19 @@ func Attention(ctx *context.Context, x *Node, config ModelConfig, pos *Node) *No
 	numKVHeads := config.NumKVHeads
 	headDim := config.HeadDim
 	
-	// Q, K, V Projections
+	// Q Projection (always local to the layer)
 	wq := ctx.In("wq").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, numHeads*headDim)).SetTrainable(false).ValueGraph(g)
-	wk := ctx.In("wk").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, numKVHeads*headDim)).SetTrainable(false).ValueGraph(g)
-	wv := ctx.In("wv").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, numKVHeads*headDim)).SetTrainable(false).ValueGraph(g)
+	
+	// K, V Projections (can be shared across layers)
+	kProjCtx := ctx
+	vProjCtx := ctx
+	if kvCtx != nil {
+		kProjCtx = kvCtx
+		vProjCtx = kvCtx
+	}
+	
+	wk := kProjCtx.In("wk").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, numKVHeads*headDim)).SetTrainable(false).ValueGraph(g)
+	wv := vProjCtx.In("wv").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, numKVHeads*headDim)).SetTrainable(false).ValueGraph(g)
 	
 	q := Dot(x, wq).MatMul()
 	k := Dot(x, wk).MatMul()
@@ -190,4 +200,156 @@ func Repeat(x *Node, n int, axis int) *Node {
 		parts[i] = x
 	}
 	return Concatenate(parts, axis)
+}
+
+// GemmaRMSNorm implements Root Mean Square Layer Normalization for Gemma.
+func GemmaRMSNorm(ctx *context.Context, x *Node, epsilon float64) *Node {
+	g := x.Graph()
+	dtype := x.Shape().DType
+	
+	// x: [batch, seq, hidden]
+	ms := ReduceMean(Square(x), -1)
+	ms = ExpandDims(ms, -1)
+	normed := Mul(x, Rsqrt(Add(ms, Scalar(g, dtype, epsilon))))
+	
+	// Gemma adds 1 to the weight
+	hiddenSize := x.Shape().Dimensions[x.Rank()-1]
+	weight := ctx.VariableWithShape("weight", shapes.Make(dtype, hiddenSize)).SetTrainable(false).ValueGraph(g)
+	
+	// Reshape weight for broadcasting
+	weightDims := make([]int, x.Rank())
+	for i := 0; i < len(weightDims)-1; i++ {
+		weightDims[i] = 1
+	}
+	weightDims[len(weightDims)-1] = hiddenSize
+	weight = Reshape(weight, weightDims...)
+	
+	// Gemma RMSNorm: x * (1 + weight)
+	return Mul(normed, Add(weight, Scalar(g, dtype, 1.0)))
+}
+
+// GemmaMLP implements the Feed-Forward Network for Gemma architectures.
+func GemmaMLP(ctx *context.Context, x *Node, intermediateSize int) *Node {
+	g := x.Graph()
+	dtype := x.Shape().DType
+	hiddenSize := x.Shape().Dimensions[x.Rank()-1]
+	
+	// Gemma uses SwiGLU: (Silu(xW_gate) * xW_up) * W_down
+	wGate := ctx.In("gate_proj").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, intermediateSize)).SetTrainable(false).ValueGraph(g)
+	wUp := ctx.In("up_proj").VariableWithShape("weight", shapes.Make(dtype, hiddenSize, intermediateSize)).SetTrainable(false).ValueGraph(g)
+	wDown := ctx.In("down_proj").VariableWithShape("weight", shapes.Make(dtype, intermediateSize, hiddenSize)).SetTrainable(false).ValueGraph(g)
+	
+	gate := Dot(x, wGate).MatMul()
+	up := Dot(x, wUp).MatMul()
+	
+	// Silu(gate) * up
+	activatedGate := Mul(gate, Sigmoid(gate))
+	intermediate := Mul(activatedGate, up)
+	
+	return Dot(intermediate, wDown).MatMul()
+}
+
+// LayerNorm implements Layer Normalization.
+func LayerNorm(ctx *context.Context, x *Node, epsilon float64) *Node {
+	g := x.Graph()
+	dtype := x.Shape().DType
+	
+	mean := ReduceMean(x, -1)
+	mean = ExpandDims(mean, -1)
+	variance := ReduceMean(Square(Sub(x, mean)), -1)
+	variance = ExpandDims(variance, -1)
+	
+	normed := Div(Sub(x, mean), Sqrt(Add(variance, Scalar(g, dtype, epsilon))))
+	
+	hiddenSize := x.Shape().Dimensions[x.Rank()-1]
+	scale := ctx.VariableWithShape("weight", shapes.Make(dtype, hiddenSize)).SetTrainable(false).ValueGraph(g)
+	bias := ctx.VariableWithShape("bias", shapes.Make(dtype, hiddenSize)).SetTrainable(false).ValueGraph(g)
+	
+	// Reshape for broadcasting
+	dims := make([]int, x.Rank())
+	for i := 0; i < len(dims)-1; i++ {
+		dims[i] = 1
+	}
+	dims[len(dims)-1] = hiddenSize
+	scale = Reshape(scale, dims...)
+	bias = Reshape(bias, dims...)
+	
+	return Add(Mul(normed, scale), bias)
+}
+
+// SigLIPBlock represents a single SigLIP vision transformer layer.
+func SigLIPBlock(ctx *context.Context, x *Node, config ModelConfig) *Node {
+	// 1. Pre-Attention Norm
+	normX := LayerNorm(ctx.In("pre_attention_norm"), x, 1e-6)
+	
+	// 2. Attention (Non-causal)
+	// We need a non-causal version of Attention
+	attn := NonCausalAttention(ctx.In("attention"), normX, config)
+	x = Add(x, attn)
+	
+	// 3. Pre-MLP Norm
+	normX = LayerNorm(ctx.In("pre_mlp_norm"), x, 1e-6)
+	
+	// 4. MLP
+	// SigLIP uses Gelu and a simpler MLP than SwiGLU
+	hiddenSize := x.Shape().Dimensions[x.Rank()-1]
+	intermediate := layers.Dense(ctx.In("mlp/gate"), normX, true, config.IntermediateSize)
+	intermediate = activations.Gelu(intermediate)
+	mlpOut := layers.Dense(ctx.In("mlp/down"), intermediate, true, hiddenSize)
+	x = Add(x, mlpOut)
+	
+	return x
+}
+
+// NonCausalAttention implements Multi-Head Attention without a causal mask.
+func NonCausalAttention(ctx *context.Context, x *Node, config ModelConfig) *Node {
+	g := x.Graph()
+	dtype := x.Shape().DType
+	batchSize := x.Shape().Dimensions[0]
+	seqLen := x.Shape().Dimensions[1]
+	hiddenSize := x.Shape().Dimensions[2]
+	numHeads := config.NumHeads
+	headDim := hiddenSize / numHeads
+	
+	q := layers.Dense(ctx.In("wq"), x, true, numHeads*headDim)
+	k := layers.Dense(ctx.In("wk"), x, true, numHeads*headDim)
+	v := layers.Dense(ctx.In("wv"), x, true, numHeads*headDim)
+	
+	q = Reshape(q, batchSize, seqLen, numHeads, headDim)
+	k = Reshape(k, batchSize, seqLen, numHeads, headDim)
+	v = Reshape(v, batchSize, seqLen, numHeads, headDim)
+	
+	q = Transpose(q, 1, 2)
+	k = Transpose(k, 1, 2)
+	v = Transpose(v, 1, 2)
+	
+	scores := Dot(q, Transpose(k, 2, 3)).MatMul()
+	scores = Div(scores, Sqrt(Scalar(g, dtype, float64(headDim))))
+	
+	probs := Softmax(scores, -1)
+	out := Dot(probs, v).MatMul()
+	
+	out = Transpose(out, 1, 2)
+	out = Reshape(out, batchSize, seqLen, hiddenSize)
+	
+	return layers.Dense(ctx.In("wo"), out, true, hiddenSize)
+}
+
+// GemmaBlock represents a single Gemma transformer layer.
+func GemmaBlock(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kvCtx *context.Context) *Node {
+	// 1. Pre-Attention Norm
+	normX := GemmaRMSNorm(ctx.In("pre_attention_norm"), x, config.RMSNormEPS)
+	
+	// 2. Attention
+	attn := Attention(ctx.In("attention"), normX, config, pos, kvCtx)
+	x = Add(x, attn)
+	
+	// 3. Pre-MLP Norm
+	normX = GemmaRMSNorm(ctx.In("pre_mlp_norm"), x, config.RMSNormEPS)
+	
+	// 4. MLP
+	mlpOut := GemmaMLP(ctx.In("mlp"), normX, config.IntermediateSize)
+	x = Add(x, mlpOut)
+	
+	return x
 }

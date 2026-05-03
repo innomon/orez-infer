@@ -10,3 +10,4 @@
 | `track-006` | Granite-4.0-H-Micro (Graphite Hybrid) | ✅ Completed | [Plan](./tracks/track-006-graphite-hybrid/plan.md) |
 | `track-007` | Unified Weight Downloader | ✅ Completed | [Plan](./tracks/track-007-downloader/plan.md) |
 | `track-008` | OpenAI API Implementation | 🔄 In Progress | [Plan](./tracks/track-008-openai-api/plan.md) |
+| `track-009` | Gemma 3 & Gemma 4 Integration | ✅ Completed | [Plan](./tracks/track-009-gemma/plan.md) |

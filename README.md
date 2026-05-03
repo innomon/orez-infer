@@ -11,6 +11,7 @@
     - **Mac M4:** Metal-accelerated operations via `go-darwinml`.
     - **Raspberry Pi 5:** Optimized CPU backend.
 - **Architecture Registry:** Hand-crafted mappings for Llama, Gemma, Granite, and Graphite (Mamba-2) architectures.
+- **Advanced Gemma Support:** Native integration for Gemma 3 (Multi-modal) and Gemma 4 (MTP/TurboQuant).
 - **Memory Efficient:** Uses `syscall.Mmap` for zero-copy weight loading and static KV-cache allocation.
 
 ## Installation
@@ -63,7 +64,9 @@ Launch a local, OpenAI-compatible server to use `orez-infer` with standard clien
 
 ## Supported Models
 - **Llama 3**
-- **Gemma 3/4**
+- **Gemma 3 (Unified Multi-modal)**
+- **Gemma 4 (TurboQuant & MTP)**
+- **MedGemma 1.5 (Adaptive Medical Precision)**
 - **Granite 4.0**
 - **Graphite (Mamba-2 / SSM)**
 

@@ -1,8 +1,12 @@
 package model
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/gomlx/gomlx/pkg/ml/context"
 	. "github.com/gomlx/gomlx/pkg/core/graph"
+	"github.com/gomlx/gomlx/pkg/core/shapes"
 )
 
 // ModelConfig contains the parameters for a specific model architecture.
@@ -19,6 +23,17 @@ type ModelConfig struct {
 	RoPEBase         float64
 	RMSNormEPS       float64
 	Activation       string // "swiglu", "gelu", etc.
+
+	// Vision Config (for Multi-modal models like Gemma 3)
+	ImageSize        int
+	PatchSize        int
+	VisionHiddenSize int
+	VisionLayers     int
+	VisionHeads      int
+
+	// Gemma 4 specific
+	NumMTPHeads      int
+	KVSharingRange   int // e.g., 8
 }
 
 // GraphBuilder defines the interface for constructing architecture-specific graphs.
@@ -33,9 +48,13 @@ type ArchRegistry struct {
 }
 
 func NewArchRegistry() *ArchRegistry {
-	return &ArchRegistry{
+	r := &ArchRegistry{
 		builders: make(map[string]GraphBuilder),
 	}
+	r.Register("recurrent", &RecurrentBuilder{})
+	r.Register("gemma-3", &Gemma3Builder{})
+	r.Register("gemma-4", &Gemma4Builder{})
+	return r
 }
 
 func (r *ArchRegistry) Register(name string, builder GraphBuilder) {

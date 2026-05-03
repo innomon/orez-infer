@@ -16,6 +16,16 @@
 
 - **Unified Downloader:** Use `pkg/downloader` for all weight fetching. Support GGUF, Safetensors, and LiteRT.
 
+## Architecture: Gemma 4 & MedGemma 1.5
+
+- **Adaptive Precision:** The engine must support token-triggered dequantization switching.
+    - `<|think|>` (5001): Reasoning mode.
+    - `<|medical|>` (5003): Medical mode (switches to `MedicalRadiusLevels` codebook).
+    - `<|audio|>` (5004): Audio mode (switches to `AudioRadiusLevels` codebook).
+    - `<|image|>` (5005): Vision mode.
+- **Shared KV Cache:** Support group-based KV head sharing (typically 8 layers) in `BuildGemma4Model`.
+- **TurboQuant:** Use Polar coordinates (Radius/Angle) with QJL residual correction for KV cache compression.
+
 do not search/look/grep inside .venv dirs.
 
 ## Coding Standards
