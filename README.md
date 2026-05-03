@@ -6,6 +6,7 @@
 
 - **Native Implementation:** Built directly in Go and GoMLX. No heavy C++ wrappers or external CLI frameworks.
 - **Multi-Format Support:** Robust downloader and parser for **GGUF**, **Safetensors**, and **LiteRT** formats.
+- **OpenAI Compatible API:** Built-in REST server supporting `/v1/chat/completions` with streaming (SSE).
 - **Hardware Optimized:**
     - **Mac M4:** Metal-accelerated operations via `go-darwinml`.
     - **Raspberry Pi 5:** Optimized CPU backend.
@@ -36,6 +37,17 @@ The unified downloader handles different formats and ensures all required files 
 ./orez-infer infer --model models/gemma-4-E2B.gguf --backend metal --temp 0.8
 ```
 
+### 3. Start OpenAI API Server
+Launch a local, OpenAI-compatible server to use `orez-infer` with standard clients like AnythingLLM or Python `openai` library.
+
+```bash
+./orez-infer serve --model models/gemma-4-E2B.gguf --tokenizer models/tokenizer.model --port 8080 --backend metal
+```
+
+**Endpoint Support:**
+- `GET /v1/models`: List loaded models.
+- `POST /v1/chat/completions`: Chat with support for `stream: true`.
+
 ## Architecture
 
 `orez-infer` uses a **Hand-Crafted Registry** to bridge the gap between model-specific tensor names and internal graph variables.
@@ -46,6 +58,8 @@ The unified downloader handles different formats and ensures all required files 
 | **`pkg/model`** | Universal Transformer templates and architecture-specific builders. |
 | **`pkg/backend`** | Unified interface for CPU, Metal, and XLA backends. |
 | **`pkg/downloader`** | Format-aware Hugging Face Hub client. |
+| **`pkg/server`** | OpenAI-compatible REST API server. |
+| **`pkg/tokenizer`** | SentencePiece and fallback tokenizers. |
 
 ## Supported Models
 - **Llama 3**

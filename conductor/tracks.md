@@ -9,3 +9,4 @@
 | `track-005` | Recurrent Block (RDT) Architecture | ✅ Completed | [Plan](./tracks/track-005-recurrent-block/plan.md) |
 | `track-006` | Granite-4.0-H-Micro (Graphite Hybrid) | ✅ Completed | [Plan](./tracks/track-006-graphite-hybrid/plan.md) |
 | `track-007` | Unified Weight Downloader | ✅ Completed | [Plan](./tracks/track-007-downloader/plan.md) |
+| `track-008` | OpenAI API Implementation | 🔄 In Progress | [Plan](./tracks/track-008-openai-api/plan.md) |

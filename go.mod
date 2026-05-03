@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/eliben/go-sentencepiece v0.7.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/gomlx/go-darwinml v0.0.0-20260317215952-f8c0babe7356 // indirect

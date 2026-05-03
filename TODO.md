@@ -4,6 +4,7 @@
 - [x] **Unified Downloader:** Robust format-aware downloader for GGUF, Safetensors, and LiteRT.
 - [x] **GGUF Parser:** Native Go parser for metadata and tensor info.
 - [x] **Architecture Registry:** Hand-crafted mapping system for multi-model support.
+- [x] **OpenAI API (Phase 1 & 2):** Core API structure and basic inference integration.
 
 ## Current Status: Structural Implementation
 The engine architecture is fully established, including the GGUF parser, the architecture registry, and the universal transformer template. However, the Mamba-2 (SSM) logic is currently a **structural placeholder** (dummy logic).
