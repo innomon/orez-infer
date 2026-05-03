@@ -8,3 +8,4 @@
 | `track-004` | Graphite (SSM) Integration | ✅ Completed | [Plan](./tracks/track-004-graphite/plan.md) |
 | `track-005` | Recurrent Block (RDT) Architecture | ✅ Completed | [Plan](./tracks/track-005-recurrent-block/plan.md) |
 | `track-006` | Granite-4.0-H-Micro (Graphite Hybrid) | ✅ Completed | [Plan](./tracks/track-006-graphite-hybrid/plan.md) |
+| `track-007` | Unified Weight Downloader | ✅ Completed | [Plan](./tracks/track-007-downloader/plan.md) |

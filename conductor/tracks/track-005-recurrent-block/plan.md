@@ -2,6 +2,8 @@
 
 Implementation of the Recurrent-Depth Transformer (RDT) / Recurrent Block architecture as defined in OpenMythos, utilizing weight-sharing across depth and stable LTI-based input injection.
 
+referenced [OpenMythos](https://github.com/kyegomez/OpenMythos)
+
 ## 1. Research & Mathematical Modeling
 - [ ] Define the stable discretization for the linear injection matrix $A$.
   - $A_{\text{cont}} = -\exp(\text{log\_A})$

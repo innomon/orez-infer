@@ -14,6 +14,10 @@
     - `/home/innomon/orez/llm/go-LiteRT-LM`
     - `/home/innomon/orez/llm/go-turboquant`
 
+- **Unified Downloader:** Use `pkg/downloader` for all weight fetching. Support GGUF, Safetensors, and LiteRT.
+
+do not search/look/grep inside .venv dirs.
+
 ## Coding Standards
 
 - Follow idiomatic Go patterns.
