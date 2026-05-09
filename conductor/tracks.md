@@ -11,3 +11,4 @@
 | `track-007` | Unified Weight Downloader | ✅ Completed | [Plan](./tracks/track-007-downloader/plan.md) |
 | `track-008` | OpenAI API Implementation | ✅ Completed | [Plan](./tracks/track-008-openai-api/plan.md) |
 | `track-009` | Gemma 3 & Gemma 4 Integration | ✅ Completed | [Plan](./tracks/track-009-gemma/plan.md) |
+| `track-010` | BitNet b1.58 Implementation | ⏳ In Progress | [Plan](./tracks/track-010-bitnet/plan.md) |
