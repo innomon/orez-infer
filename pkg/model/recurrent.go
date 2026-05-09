@@ -70,7 +70,7 @@ func (t *RecurrentTransformer) BuildGraph(ctx *context.Context, x *Node) *Node {
 	
 	// 1. Prelude (Encoding)
 	embd := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, t.Config.VocabSize, t.Config.HiddenSize)).SetTrainable(false).ValueGraph(g)
-	e := Gather(embd, x) // Injection Signal
+	e := Gather(embd, ExpandDims(x, -1)) // Injection Signal
 	
 	// Initial hidden state
 	h := e

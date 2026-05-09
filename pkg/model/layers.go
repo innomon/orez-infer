@@ -83,7 +83,14 @@ func RoPE(x *Node, offset *Node, base float64) *Node {
 	exponent := Mul(indicesF, Scalar(g, shape.DType, -2.0/float64(headDim)))
 	freqs := Exp(Mul(Log(Scalar(g, shape.DType, base)), exponent))
 	
-	t := Add(Iota(g, shapes.Make(dtypes.Int32, seqLen), 0), ConvertType(offset, dtypes.Int32))
+	t := Iota(g, shapes.Make(dtypes.Int32, seqLen), 0)
+	if offset != nil {
+		// Ensure offset is rank 1 or 0 for addition to Iota(seqLen)
+		if offset.Rank() > 1 {
+			offset = Reshape(offset) // Flatten to rank 1 if it has 1 element, or similar
+		}
+		t = Add(t, ConvertType(offset, dtypes.Int32))
+	}
 	tF := ConvertType(t, shape.DType)
 	
 	phases := Mul(Reshape(tF, seqLen, 1), Reshape(freqs, 1, halfDim))
@@ -174,6 +181,8 @@ func Attention(ctx *context.Context, x *Node, config ModelConfig, pos *Node, kvC
 	
 	// Causal Mask
 	mask := CausalMask(g, seqLen)
+	// Reshape mask for broadcasting: [1, 1, seqLen, seqLen]
+	mask = Reshape(mask, 1, 1, seqLen, seqLen)
 	scores = Add(scores, Mul(mask, Scalar(g, dtype, -1e10)))
 	
 	probs := Softmax(scores, -1)

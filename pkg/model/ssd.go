@@ -76,7 +76,7 @@ func (b *GraniteBuilder) Build(ctx *context.Context, config ModelConfig, x *Node
 
 	// 1. Embeddings
 	embd := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
-	h := Gather(embd, x)
+	h := Gather(embd, ExpandDims(x, -1))
 
 	// 2. Vision Encoder (Optional)
 	if image != nil {

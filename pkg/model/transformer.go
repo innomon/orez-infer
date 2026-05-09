@@ -26,7 +26,7 @@ func (t *UniversalTransformer) buildCore(ctx *context.Context, x *Node, pos *Nod
 	
 	// Token Embeddings
 	embd := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, t.Config.VocabSize, t.Config.HiddenSize)).SetTrainable(false).ValueGraph(g)
-	h := Gather(embd, x)
+	h := Gather(embd, ExpandDims(x, -1))
 	
 	// Layers
 	for i := 0; i < t.Config.NumLayers; i++ {

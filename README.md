@@ -10,7 +10,8 @@
 - **Hardware Optimized:**
     - **Mac M4:** Metal-accelerated operations via `go-darwinml`.
     - **Raspberry Pi 5:** Optimized CPU backend.
-- **Architecture Registry:** Hand-crafted mappings for Llama, Gemma, Granite, and Graphite (Mamba-2) architectures.
+- **Architecture Registry:** Hand-crafted mappings for Llama, Gemma, Granite, BitNet, and Graphite (Mamba-2) architectures.
+- **BitNet b1.58 Support:** Native implementation of ternary weights and 8-bit activation quantization for extreme inference efficiency.
 - **Advanced Gemma Support:** Native integration for Gemma 3 (Multi-modal) and Gemma 4 (MTP/TurboQuant).
 - **Per-Layer Embeddings (PLE):** Memory-efficient, adaptive embedding integration for extreme context long-inference.
 - **Memory Efficient:** Uses `syscall.Mmap` for zero-copy weight loading and static KV-cache allocation.
@@ -32,6 +33,9 @@ The unified downloader handles different formats and ensures all required files 
 
 # Download Safetensors (automatically fetches config and all shards)
 ./orez-infer download --repo google/gemma-2b --format safetensors
+
+# Download official BitNet b1.58 (Microsoft)
+./orez-infer download --repo microsoft/bitnet-b1.58-2B-4T --format safetensors
 ```
 
 ### 2. Run Inference
@@ -67,6 +71,7 @@ For detailed information on multimodal support, see **[MedGemma 1.5 Support](./d
 
 ## Supported Models
 - **Llama 3**
+- **BitNet b1.58 (Ternary LLM)**
 - **Gemma 3 (Unified Multi-modal)**
 - **Gemma 4 (TurboQuant & MTP)**
 - **MedGemma 1.5 (Adaptive Medical Precision)**

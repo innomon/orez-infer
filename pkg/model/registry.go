@@ -54,6 +54,7 @@ func NewArchRegistry() *ArchRegistry {
 	r.Register("gemma-3", &Gemma3Builder{})
 	r.Register("gemma-4", &Gemma4Builder{})
 	r.Register("llama", &LlamaBuilder{})
+	r.Register("bitnet-b1.58", &BitNetBuilder{})
 	r.Register("graphite", &GraphiteBuilder{})
 	r.Register("granite", &GraniteBuilder{})
 	return r

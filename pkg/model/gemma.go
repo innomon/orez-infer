@@ -48,7 +48,7 @@ func BuildGemma3Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 
 	// 1. Embedding
 	embWeight := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
-	x := Gather(embWeight, tokens)
+	x := Gather(embWeight, ExpandDims(tokens, -1))
 
 	// 2. Vision Encoder (Optional)
 	if image != nil {
@@ -167,7 +167,7 @@ func BuildGemma4Model(ctx *context.Context, tokens *Node, config ModelConfig, po
 
 	// 2. Embedding
 	embWeight := ctx.In("token_embd").VariableWithShape("weight", shapes.Make(dtype, config.VocabSize, config.HiddenSize)).SetTrainable(false).ValueGraph(g)
-	x := Gather(embWeight, tokens)
+	x := Gather(embWeight, ExpandDims(tokens, -1))
 
 	// 3. Vision Encoder (Optional)
 	if image != nil {
