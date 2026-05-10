@@ -1,6 +1,7 @@
 # Binaries and executables
-orez-infer
-gguf-info
+/orez-infer
+/gguf-info
+/bin/
 *.exe
 *.exe~
 *.dll
